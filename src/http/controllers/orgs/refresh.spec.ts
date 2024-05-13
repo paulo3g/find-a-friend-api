@@ -1,0 +1,53 @@
+import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import request from 'supertest'
+
+import { app } from '@/app'
+
+describe('Refresh Token (e2e)', () => {
+  beforeAll(async () => {
+    await app.ready()
+  })
+
+  afterAll(async () => {
+    await app.close()
+  })
+
+  it('should be able to refresh token', async () => {
+    await request(app.server).post('/orgs').send({
+      name: 'Org 01',
+      email: 'org@org.com.br',
+      whatsapp: '1234567890',
+      password: '123456',
+      passwordConfirm: '123456',
+      cep: '12345678',
+      state: 'State 01',
+      city: 'City 01',
+      neighborhood: 'Neighborhood 01',
+      street: 'Street 01',
+      latitude: 1,
+      longitude: 1,
+    })
+
+    const authResponse = await request(app.server).post('/sessions').send({
+      email: 'org@org.com.br',
+      password: '123456',
+    })
+
+    const cookies = authResponse.get('Set-Cookie')
+
+    const setCookieHeader = cookies ? cookies.join('; ') : ''
+
+    const response = await request(app.server)
+      .patch('/token/refresh')
+      .set('Cookie', setCookieHeader)
+      .send()
+
+    expect(response.status).toEqual(200)
+    expect(response.body).toEqual({
+      token: expect.any(String),
+    })
+    expect(response.get('Set-Cookie')).toEqual([
+      expect.stringContaining('refreshToken='),
+    ])
+  })
+})
